@@ -1,5 +1,5 @@
 #include <iostream>
-//#include <map>
+#include <map>
 #include <vector>
 #include <cassert>
 #include <mpi.h>
@@ -14,30 +14,22 @@ class MapMatrix{
 public:
   typedef std::pair<int,int>   N2;
 
-  //std::map<N2,double>  data;
+  std::map<N2,double>  data;
   int nbrow;
   int nbcol;
-  int nnz;
-  int data_index[nbrow*nbcol];
-  int data_value[nbrow*nbcol];
-  int data_rowptrs[nbrow]= &data_index;
 
 public:
   MapMatrix(const int& nr, const int& nc):
     nbrow(nr), nbcol(nc) {}; 
 
   MapMatrix(const MapMatrix& m): 
-    nbrow(m.nbrow), nbcol(m.nbcol), nnz(m.nnz), data_index(m.data_index), 
-    data_value(m.data_value), data_rowptrs(m.rowptrs) {}; 
+    nbrow(m.nbrow), nbcol(m.nbcol), data(m.data) {}; 
   
   MapMatrix& operator=(const MapMatrix& m){ 
     if(this!=&m){
       nbrow=m.nbrow;
       nbcol=m.nbcol;
-      nnz=m.nnz;
-      data_index=m.data_index;
-      data_value=m.data_value;
-      data_rowptrs=m.rowptrs;
+      data=m.data;
     }   
     return *this; 
   }
@@ -45,21 +37,14 @@ public:
   int NbRow() const {return nbrow;}
   int NbCol() const {return nbcol;}
 
-
   double operator()(const int& j, const int& k) const {
-    for (int iter=data_rowptrs[j]; iter++, iter < rowptrs[j+1])  {
-      if (data_index[iter]==k)  {
-        return data_value[iter]
-      }
-    }
+    auto search = data.find(std::make_pair(j,k));
+    if(search!=data.end()) return search->second;
     return 0;
-    // auto search = data.find(std::make_pair(j,k));
-    // if(search!=data.end()) return search->second;
-    // return 0;
   }
 
   double& Assign(const int& j, const int& k) {
-    return data[std::make_pair(j,k)]; //???
+    return data[std::make_pair(j,k)];
   }
 
   // parallel matrix-vector product with distributed vector xi
@@ -72,24 +57,12 @@ public:
     
 
     std::vector<double> b(NbRow(),0.);
-    
-    for (int i=0; i++; i<nnz) {
-      int k = data_index[nnz];
-      int j = i;
-      int row_it=0;
-      while (j > nbcol) {
-        j -= data_rowptrs[row_it];
-        row_it +=1
-      }
+    for(auto it=data.begin(); it!=data.end(); ++it){
+      int j = (it->first).first;
+      int k = (it->first).second; 
       double Mjk = it->second;
       b[j] += Mjk*x[k];
     }
-    // for(auto it=data.begin(); it!=data.end(); ++it){
-    //   int j = (it->first).first;
-    //   int k = (it->first).second; 
-    //   double Mjk = it->second;
-    //   b[j] += Mjk*x[k];
-    // }
 
     return b;
   }
