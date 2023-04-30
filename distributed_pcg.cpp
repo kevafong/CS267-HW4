@@ -1,5 +1,5 @@
 #include <iostream>
-//#include <map>
+#include <map>
 #include <vector>
 #include <cassert>
 #include <mpi.h>
@@ -7,89 +7,65 @@
 
 #include <Eigen/Sparse>
 
-typedef Eigen::SparseMatrix<double> SpMat; // declares a column-major sparse matrix type of double
+typedef Eigen::SparseMatrix<double, Eigen::RowMajor> SpMat; // declares a row-major sparse matrix type of double
 typedef Eigen::Triplet<double> T;
 
-class MapMatrix{
+class MapMatrix
+{
 public:
-  typedef std::pair<int,int>   N2;
+  typedef std::pair<int, int> N2;
 
-  //std::map<N2,double>  data;
+  std::map<N2, double> data;
   int nbrow;
   int nbcol;
-  int nnz;
-  int data_index[nbrow*nbcol];
-  int data_value[nbrow*nbcol];
-  int data_rowptrs[nbrow]= &data_index;
 
 public:
-  MapMatrix(const int& nr, const int& nc):
-    nbrow(nr), nbcol(nc) {}; 
+  MapMatrix(const int &nr, const int &nc) : nbrow(nr), nbcol(nc){};
 
-  MapMatrix(const MapMatrix& m): 
-    nbrow(m.nbrow), nbcol(m.nbcol), nnz(m.nnz), data_index(m.data_index), 
-    data_value(m.data_value), data_rowptrs(m.rowptrs) {}; 
-  
-  MapMatrix& operator=(const MapMatrix& m){ 
-    if(this!=&m){
-      nbrow=m.nbrow;
-      nbcol=m.nbcol;
-      nnz=m.nnz;
-      data_index=m.data_index;
-      data_value=m.data_value;
-      data_rowptrs=m.rowptrs;
-    }   
-    return *this; 
-  }
+  MapMatrix(const MapMatrix &m) : nbrow(m.nbrow), nbcol(m.nbcol), data(m.data){};
 
-  int NbRow() const {return nbrow;}
-  int NbCol() const {return nbcol;}
-
-
-  double operator()(const int& j, const int& k) const {
-    for (int iter=data_rowptrs[j]; iter++, iter < rowptrs[j+1])  {
-      if (data_index[iter]==k)  {
-        return data_value[iter]
-      }
+  MapMatrix &operator=(const MapMatrix &m)
+  {
+    if (this != &m)
+    {
+      nbrow = m.nbrow;
+      nbcol = m.nbcol;
+      data = m.data;
     }
-    return 0;
-    // auto search = data.find(std::make_pair(j,k));
-    // if(search!=data.end()) return search->second;
-    // return 0;
+    return *this;
   }
 
-  double& Assign(const int& j, const int& k) {
-    return data[std::make_pair(j,k)]; //???
+  int NbRow() const { return nbrow; }
+  int NbCol() const { return nbcol; }
+
+  double operator()(const int &j, const int &k) const
+  {
+    auto search = data.find(std::make_pair(j, k));
+    if (search != data.end())
+      return search->second;
+    return 0;
+  }
+
+  double &Assign(const int &j, const int &k)
+  {
+    return data[std::make_pair(j, k)];
   }
 
   // parallel matrix-vector product with distributed vector xi
-  std::vector<double> operator*(const std::vector<double>& xi) const {
-
-
+  std::vector<double> operator*(const std::vector<double> &xi) const
+  {
 
     std::vector<double> x(NbCol());
-    std::copy(xi.begin(),xi.end(),x.begin());
-    
+    std::copy(xi.begin(), xi.end(), x.begin());
 
-    std::vector<double> b(NbRow(),0.);
-    
-    for (int i=0; i++; i<nnz) {
-      int k = data_index[nnz];
-      int j = i;
-      int row_it=0;
-      while (j > nbcol) {
-        j -= data_rowptrs[row_it];
-        row_it +=1
-      }
+    std::vector<double> b(NbRow(), 0.);
+    for (auto it = data.begin(); it != data.end(); ++it)
+    {
+      int j = (it->first).first;
+      int k = (it->first).second;
       double Mjk = it->second;
-      b[j] += Mjk*x[k];
+      b[j] += Mjk * x[k];
     }
-    // for(auto it=data.begin(); it!=data.end(); ++it){
-    //   int j = (it->first).first;
-    //   int k = (it->first).second; 
-    //   double Mjk = it->second;
-    //   b[j] += Mjk*x[k];
-    // }
 
     return b;
   }
@@ -98,59 +74,80 @@ public:
 #include <cmath>
 
 // parallel scalar product (u,v) (u and v are distributed)
-double operator,(const std::vector<double>& u, const std::vector<double>& v){ 
-  assert(u.size()==v.size());
-  double sp=0.;
-  for(int j=0; j<u.size(); j++){sp+=u[j]*v[j];}
+double operator,(const std::vector<double> &u, const std::vector<double> &v)
+{
+  assert(u.size() == v.size());
+  double sp = 0.;
+  for (int j = 0; j < u.size(); j++)
+  {
+    sp += u[j] * v[j];
+  }
 
-  return sp; 
+  return sp;
 }
 
 // norm of a vector u
-double Norm(const std::vector<double>& u) { 
-  return sqrt((u,u));
+double Norm(const std::vector<double> &u)
+{
+  return sqrt((u, u));
 }
 
 // addition of two vectors u+v
-std::vector<double> operator+(const std::vector<double>& u, const std::vector<double>& v){ 
-  assert(u.size()==v.size());
-  std::vector<double> w=u;
-  for(int j=0; j<u.size(); j++){w[j]+=v[j];}
+std::vector<double> operator+(const std::vector<double> &u, const std::vector<double> &v)
+{
+  assert(u.size() == v.size());
+  std::vector<double> w = u;
+  for (int j = 0; j < u.size(); j++)
+  {
+    w[j] += v[j];
+  }
   return w;
 }
 
 // multiplication of a vector by a scalar a*u
-std::vector<double> operator*(const double& a, const std::vector<double>& u){ 
+std::vector<double> operator*(const double &a, const std::vector<double> &u)
+{
   std::vector<double> w(u.size());
-  for(int j=0; j<w.size(); j++){w[j]=a*u[j];}
+  for (int j = 0; j < w.size(); j++)
+  {
+    w[j] = a * u[j];
+  }
   return w;
 }
 
 // addition assignment operator, add v to u
-void operator+=(std::vector<double>& u, const std::vector<double>& v){ 
-  assert(u.size()==v.size());
-  for(int j=0; j<u.size(); j++){u[j]+=v[j];}
+void operator+=(std::vector<double> &u, const std::vector<double> &v)
+{
+  assert(u.size() == v.size());
+  for (int j = 0; j < u.size(); j++)
+  {
+    u[j] += v[j];
+  }
 }
 
 /* block Jacobi preconditioner: perform forward and backward substitution
    using the Cholesky factorization of the local diagonal block computed by Eigen */
-std::vector<double> prec(const Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>>& P, const std::vector<double>& u){
+std::vector<double> prec(const Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> &P, const std::vector<double> &u)
+{
   Eigen::VectorXd b(u.size());
-  for (int i=0; i<u.size(); i++) b[i] = u[i];
+  for (int i = 0; i < u.size(); i++)
+    b[i] = u[i];
   Eigen::VectorXd xe = P.solve(b);
   std::vector<double> x(u.size());
-  for (int i=0; i<u.size(); i++) x[i] = xe[i];
+  for (int i = 0; i < u.size(); i++)
+    x[i] = xe[i];
   return x;
 }
 
 // distributed conjugate gradient
-void CG(const MapMatrix& A,
-        const std::vector<double>& b,
-        std::vector<double>& x,
-        double tol=1e-6) {
+void CG(const MapMatrix &A,
+        const std::vector<double> &b,
+        std::vector<double> &x,
+        double tol = 1e-6)
+{
 
   assert(b.size() == A.NbRow());
-  x.assign(b.size(),0.);
+  x.assign(b.size(), 0.);
 
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Get the rank of the process
@@ -159,123 +156,205 @@ void CG(const MapMatrix& A,
 
   // get the local diagonal block of A
   std::vector<Eigen::Triplet<double>> coefficients;
-  for(auto it=A.data.begin(); it!=A.data.end(); ++it){
+  for (auto it = A.data.begin(); it != A.data.end(); ++it)
+  {
     int j = (it->first).first;
     int k = (it->first).second;
-    if (k >= 0 && k < n) coefficients.push_back(Eigen::Triplet<double>(j,k,it->second)); 
+    if (k >= 0 && k < n)
+      coefficients.push_back(Eigen::Triplet<double>(j, k, it->second));
   }
 
   // compute the Cholesky factorization of the diagonal block for the preconditioner
-  Eigen::SparseMatrix<double> B(n,n);
+  Eigen::SparseMatrix<double> B(n, n);
   B.setFromTriplets(coefficients.begin(), coefficients.end());
   Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> P(B);
 
-  std::vector<double> r=b, z=prec(P,r), p=z, Ap=A*p;
-  double np2=(p,Ap), alpha=0.,beta=0.;
-  double nr = sqrt((z,r));
-  double epsilon = tol*nr;
+  std::vector<double> r = b, z = prec(P, r), p = z, Ap = A * p;
+  double np2 = (p, Ap), alpha = 0., beta = 0.;
+  double nr = sqrt((z, r));
+  double epsilon = tol * nr;
 
-  std::vector<double> res = A*x;
-  res += (-1)*b;
-  
-  double rres = sqrt((res,res));
+  std::vector<double> res = A * x;
+  res += (-1) * b;
+
+  double rres = sqrt((res, res));
 
   int num_it = 0;
-  while(rres>1e-5) {
-    alpha = (nr*nr)/(np2);
-    x += (+alpha)*p; 
-    r += (-alpha)*Ap;
-    z = prec(P,r);
-    nr = sqrt((z,r));
-    beta = (nr*nr)/(alpha*np2); 
-    p = z+beta*p;    
-    Ap=A*p;
-    np2=(p,Ap);
+  while (rres > 1e-5)
+  {
+    alpha = (nr * nr) / (np2);
+    x += (+alpha) * p;
+    r += (-alpha) * Ap;
+    z = prec(P, r);
+    nr = sqrt((z, r));
+    beta = (nr * nr) / (alpha * np2);
+    p = z + beta * p;
+    Ap = A * p;
+    np2 = (p, Ap);
 
-    rres = sqrt((r,r));
+    rres = sqrt((r, r));
 
     num_it++;
-    if(rank == 0 && !(num_it%1)) {
+    if (rank == 0 && !(num_it % 1))
+    {
       std::cout << "iteration: " << num_it << "\t";
-      std::cout << "residual:  " << rres     << "\n";
+      std::cout << "residual:  " << rres << "\n";
     }
   }
 }
 
 // Command Line Option Processing
-int find_arg_idx(int argc, char** argv, const char* option) {
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], option) == 0) {
-            return i;
-        }
+int find_arg_idx(int argc, char **argv, const char *option)
+{
+  for (int i = 1; i < argc; ++i)
+  {
+    if (strcmp(argv[i], option) == 0)
+    {
+      return i;
     }
-    return -1;
+  }
+  return -1;
 }
 
-int find_int_arg(int argc, char** argv, const char* option, int default_value) {
-    int iplace = find_arg_idx(argc, argv, option);
+int find_int_arg(int argc, char **argv, const char *option, int default_value)
+{
+  int iplace = find_arg_idx(argc, argv, option);
 
-    if (iplace >= 0 && iplace < argc - 1) {
-        return std::stoi(argv[iplace + 1]);
-    }
+  if (iplace >= 0 && iplace < argc - 1)
+  {
+    return std::stoi(argv[iplace + 1]);
+  }
 
-    return default_value;
+  return default_value;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
   MPI_Init(&argc, &argv); // Initialize the MPI environment
-  
+
   int size;
   MPI_Comm_size(MPI_COMM_WORLD, &size); // Get the number of processes
-  
+
   int rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Get the rank of the process
 
-    if (find_arg_idx(argc, argv, "-h") >= 0) {
-        std::cout << "-N <int>: side length of the sparse matrix" << std::endl;
-        return 0;
-    }
+  if (rank == 0)
+    std::cout << "Number of procs " << size << std::endl;
 
-
-
+  if (find_arg_idx(argc, argv, "-h") >= 0)
+  {
+    std::cout << "-N <int>: side length of the sparse matrix" << std::endl;
+    return 0;
+  }
 
   int N = find_int_arg(argc, argv, "-N", 100000); // global size
 
-  assert(N%size == 0);
-  int n = N/size; // number of local rows
+  assert(N % size == 0);
+  int n = N / size; // number of local rows
 
   // row-distributed matrix
-  MapMatrix A(n,N);
+  double map_time = MPI_Wtime();
 
-  int offset = n*rank;
+  MapMatrix A(n, N);
 
-  // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
-  for (int i=0; i<n; i++) {
-    A.Assign(i,i)=2.0;
-    if (offset + i - 1 >= 0) A.Assign(i,i - 1) = -1;
-    if (offset + i + 1 < N)  A.Assign(i,i + 1) = -1;
-    if (offset + i + N < N) A.Assign(i, i + N) = -1;
-    if (offset + i - N >= 0) A.Assign(i, i - N) = -1;
+  int offset = n * rank;
+
+  // NEW MATRIX
+  // Making sparse matrix using eigen instead of map.
+  std::vector<T> tripletList;
+  for (int i = 0; i < n; i++)
+  {
+    int j = i;
+    int v_ij = 2.0;
+    tripletList.push_back(T(i, j, v_ij));
+    // A.Assign(i, i) = 2.0;
+
+    if (offset + i - 1 >= 0)
+    {
+      j = i - 1;
+      v_ij = -1;
+      tripletList.push_back(T(i, j, v_ij));
+      // A.Assign(i, i - 1) = -1;
+    }
+
+    if (offset + i + 1 < N)
+    {
+      j = i + 1;
+      v_ij = -1;
+      tripletList.push_back(T(i, j, v_ij));
+      // A.Assign(i, i + 1) = -1;
+    }
+
+    if (offset + i + N < N)
+    {
+      j = i + N;
+      v_ij = -1;
+      tripletList.push_back(T(i, j, v_ij));
+      // A.Assign(i, i + N) = -1;
+    }
+
+    if (offset + i - N >= 0)
+    {
+      j = i - N;
+      v_ij = -1;
+      tripletList.push_back(T(i, j, v_ij));
+      // A.Assign(i, i - N) = -1;
+    }
+  }
+  SpMat M(n, N);
+  M.setFromTriplets(tripletList.begin(), tripletList.end());
+
+  if (rank == 0)
+  {
+    std::cout << "Print matrix " << std::endl;
+    std::cout << M << std::endl;
   }
 
+  // ORIGINAL IMPLEMENTATION
+  // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
+  for (int i = 0; i < n; i++)
+  {
+    A.Assign(i, i) = 2.0;
+    if (offset + i - 1 >= 0)
+      A.Assign(i, i - 1) = -1;
+    if (offset + i + 1 < N)
+      A.Assign(i, i + 1) = -1;
+    if (offset + i + N < N)
+      A.Assign(i, i + N) = -1;
+    if (offset + i - N >= 0)
+      A.Assign(i, i - N) = -1;
+  }
+
+  // prints map
+  for (const auto &elem : A.data)
+  {
+    std::cout << elem.first.first << " " << elem.first.second << " " << elem.second << "\n";
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  if (rank == 0)
+    std::cout << "wall time for Map: " << MPI_Wtime() - map_time << std::endl;
+
   // initial guess
-  std::vector<double> x(n,0);
+  std::vector<double> x(n, 0);
 
   // right-hand side
-  std::vector<double> b(n,1);
+  std::vector<double> b(n, 1);
 
   MPI_Barrier(MPI_COMM_WORLD);
   double time = MPI_Wtime();
 
-  CG(A,b,x);
+  CG(A, b, x);
 
   MPI_Barrier(MPI_COMM_WORLD);
-  if (rank == 0) std::cout << "wall time for CG: " << MPI_Wtime()-time << std::endl;
+  if (rank == 0)
+    std::cout << "wall time for CG: " << MPI_Wtime() - time << std::endl;
 
-  std::vector<double> r = A*x + (-1)*b;
+  std::vector<double> r = A * x + (-1) * b;
 
-  double err = Norm(r)/Norm(b);
-  if (rank == 0) std::cout << "|Ax-b|/|b| = " << err << std::endl;
+  double err = Norm(r) / Norm(b);
+  if (rank == 0)
+    std::cout << "|Ax-b|/|b| = " << err << std::endl;
 
   MPI_Finalize(); // Finalize the MPI environment
 
