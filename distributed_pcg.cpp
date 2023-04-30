@@ -328,7 +328,7 @@ int main(int argc, char *argv[])
   int recvbuf[M.nonZeros()];
   int displs[M.rows()] = {0};
   MPI_Scatterv( M.valuePtr(), sendcounts, displs, MPI_DOUBLE,
-              recvbuf, sendcounts, MPI_DOUBLE, 0, MPI_COMM_WORLD );
+              recvbuf, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
   std::cout << "At proc" << rank << "Print matrix" << std::endl;
   std::cout << M << std::endl;
