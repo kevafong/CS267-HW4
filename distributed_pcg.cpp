@@ -312,7 +312,7 @@ int main(int argc, char *argv[])
     std::cout << "Values: " << *M.valuePtr() << std::endl;
     std::cout << "Values: ";
     for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
-    std::cout << << std::endl;
+    std::cout << std::endl;
     std::cout << "Inner: " << *M.outerIndexPtr() << std::endl;
     std::cout << "Outer:  "<< *M.innerIndexPtr() << std::endl;
   }
