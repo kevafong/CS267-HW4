@@ -335,7 +335,7 @@ int main(int argc, char *argv[])
               rptr, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
   std::cout << "At proc" << rank << " Receive Buffer" << std::endl;
-  std::cout << recvbuf << std::endl;
+  std::cout << *recvbuf << std::endl;
 
   // // ORIGINAL IMPLEMENTATION
   // // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
