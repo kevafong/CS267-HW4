@@ -304,9 +304,9 @@ int main(int argc, char *argv[])
   SpMat M(n, N);
   M.setFromTriplets(tripletList.begin(), tripletList.end());
 
-  int sendbuffer[M.rows];
-  for (int i=0; i<M.rows-2; i++)  sendbuffer[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
-  sendbuffer[M.rows -1] = M.nonZeros() - * (M.outerIndexPtr() + M.rows -1)
+  int sendbuffer[M.rows()];
+  for (int i=0; i<M.rows()-2; i++)  sendbuffer[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
+  sendbuffer[M.rows() -1] = M.nonZeros() - * (M.outerIndexPtr() + M.rows() -1)
 
   if (rank == 0)
   {
@@ -321,7 +321,7 @@ int main(int argc, char *argv[])
     std::cout << "Outer: ";
     for (int *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
     std::cout << std::endl;
-    for (i=0; i<M.rows-2; i++)  std::cout << sendbuffer[i] << " ";
+    for (i=0; i<M.rows()-2; i++)  std::cout << sendbuffer[i] << " ";
     std::cout << std::endl;
   }
 
