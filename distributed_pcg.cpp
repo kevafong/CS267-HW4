@@ -315,7 +315,7 @@ int main(int argc, char *argv[])
     for (double *q= M.innerIndexPtr(); q != M.innerIndexPtr() + M.nonZeros(); q++)  std::cout << *q << " ";
     std::cout << std::endl;
     std::cout << "Outer: ";
-    for (double *q= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
+    for (double *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
     std::cout << std::endl;
 
   }
