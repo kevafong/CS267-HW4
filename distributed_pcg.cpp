@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
     std::cout << std::endl;
   }
   int recvbuf[size][M.nonZeros()]={0}, *rptr;
-  rptr = &recvarray[0][rank];
+  rptr = &recvbuf[0][rank];
   int displs[N] = {0};
   MPI_Scatterv( M.valuePtr(), sendcounts, displs, MPI_DOUBLE,
               recvbuf, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
