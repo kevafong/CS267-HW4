@@ -262,9 +262,9 @@ int main(int argc, char *argv[])
   // NEW MATRIX
   // Making sparse matrix using eigen instead of map.
   std::vector<T> tripletList;
-  SpMat M(n, N);
+  SpMat M(N, N);
   if (rank == 0)  {
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < N; i++) {
     int j = i;
     int v_ij = 2.0;
     tripletList.push_back(T(i, j, v_ij));
