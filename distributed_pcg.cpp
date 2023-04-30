@@ -261,6 +261,7 @@ int main(int argc, char *argv[])
 
   // NEW MATRIX
   // Making sparse matrix using eigen instead of map.
+  if (rank == 0)  {
   std::vector<T> tripletList;
   for (int i = 0; i < n; i++)
   {
@@ -303,6 +304,7 @@ int main(int argc, char *argv[])
   }
   SpMat M(n, N);
   M.setFromTriplets(tripletList.begin(), tripletList.end());
+  }
 
   int sendcounts[M.rows()];
   for (int i=0; i<M.rows()-1; i++)  sendcounts[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
@@ -325,34 +327,34 @@ int main(int argc, char *argv[])
     for (int i=0; i<M.rows(); i++)  std::cout << sendcounts[i] << " ";
     std::cout << std::endl;
   }
-  int recvbuf[M.nonZeros()];
+  int recvbuf;
   int displs[M.rows()] = {0};
   MPI_Scatterv( M.valuePtr(), sendcounts, displs, MPI_DOUBLE,
               recvbuf, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
-  std::cout << "At proc" << rank << "Print matrix" << std::endl;
-  std::cout << M << std::endl;
+  std::cout << "At proc" << rank << " Receive Buffer" << std::endl;
+  std::cout << recvbuf << std::endl;
 
-  // ORIGINAL IMPLEMENTATION
-  // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
-  for (int i = 0; i < n; i++)
-  {
-    A.Assign(i, i) = 2.0;
-    if (offset + i - 1 >= 0)
-      A.Assign(i, i - 1) = -1;
-    if (offset + i + 1 < N)
-      A.Assign(i, i + 1) = -1;
-    if (offset + i + N < N)
-      A.Assign(i, i + N) = -1;
-    if (offset + i - N >= 0)
-      A.Assign(i, i - N) = -1;
-  }
+  // // ORIGINAL IMPLEMENTATION
+  // // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
+  // for (int i = 0; i < n; i++)
+  // {
+  //   A.Assign(i, i) = 2.0;
+  //   if (offset + i - 1 >= 0)
+  //     A.Assign(i, i - 1) = -1;
+  //   if (offset + i + 1 < N)
+  //     A.Assign(i, i + 1) = -1;
+  //   if (offset + i + N < N)
+  //     A.Assign(i, i + N) = -1;
+  //   if (offset + i - N >= 0)
+  //     A.Assign(i, i - N) = -1;
+  // }
 
-  // prints map
-  for (const auto &elem : A.data)
-  {
-    std::cout << elem.first.first << " " << elem.first.second << " " << elem.second << "\n";
-  }
+  // // prints map
+  // for (const auto &elem : A.data)
+  // {
+  //   std::cout << elem.first.first << " " << elem.first.second << " " << elem.second << "\n";
+  // }
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (rank == 0)
