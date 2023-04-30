@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
 
   int sendbuffer[M.rows()];
   for (int i=0; i<M.rows()-2; i++)  sendbuffer[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
-  sendbuffer[M.rows() -1] = M.nonZeros() - * (M.outerIndexPtr() + M.rows() -1)
+  sendbuffer[M.rows() -1] = M.nonZeros() - * (M.outerIndexPtr() + M.rows() -1);
 
   if (rank == 0)
   {
