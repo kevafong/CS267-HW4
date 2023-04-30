@@ -321,7 +321,7 @@ int main(int argc, char *argv[])
     std::cout << "Outer: ";
     for (int *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
     std::cout << std::endl;
-    for (i=0; i<M.rows()-2; i++)  std::cout << sendbuffer[i] << " ";
+    for (int i=0; i<M.rows()-2; i++)  std::cout << sendbuffer[i] << " ";
     std::cout << std::endl;
   }
 
