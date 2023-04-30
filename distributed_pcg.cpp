@@ -373,7 +373,7 @@ int main(int argc, char *argv[])
   MPI_Barrier(MPI_COMM_WORLD);
   double time = MPI_Wtime();
 
-  CG(A, b, x);
+  // CG(A, b, x);
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (rank == 0)
