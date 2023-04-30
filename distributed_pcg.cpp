@@ -262,7 +262,7 @@ int main(int argc, char *argv[])
   // NEW MATRIX
   // Making sparse matrix using eigen instead of map.
   std::vector<T> tripletList;
-  SpMat M(n, N);
+  SpMat M(N, N);
 
   if (rank == 0)  {
   
@@ -328,6 +328,8 @@ int main(int argc, char *argv[])
     for (int i=0; i<N; i++)  std::cout << sendcounts[i] << " ";
     std::cout << std::endl;
   }
+  MPI_Barrier(MPI_COMM_WORLD);
+
   int recvbuf[size][M.nonZeros()]={0}, *rptr;
   rptr = &recvbuf[0][rank];
   int displs[N] = {0};
