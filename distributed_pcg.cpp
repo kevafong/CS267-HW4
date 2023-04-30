@@ -309,12 +309,10 @@ int main(int argc, char *argv[])
   for (int i=0; i<N-1; i++)  sendcounts[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
   sendcounts[N -1] = M.nonZeros() - * (M.outerIndexPtr() + N -1);
 
-  
-    std::cout << "Print matrix " << std::endl;
-    std::cout << M << std::endl;
-
   if (rank == 0)
   {  
+    std::cout << "Print matrix " << std::endl;
+    std::cout << M << std::endl;
     std::cout << "Values: ";
     for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
     std::cout << std::endl;
@@ -337,7 +335,7 @@ int main(int argc, char *argv[])
               recvbuf, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
   std::cout << "At proc" << rank << " Receive Buffer" << std::endl;
-  std::cout << *recvbuf << std::endl;
+  std::cout << *(recvbuf) << std::endl;
 
   // // ORIGINAL IMPLEMENTATION
   // // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
