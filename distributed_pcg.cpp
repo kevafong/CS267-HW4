@@ -304,9 +304,9 @@ int main(int argc, char *argv[])
   SpMat M(n, N);
   M.setFromTriplets(tripletList.begin(), tripletList.end());
 
-  int sendbuffer[M.rows()];
-  for (int i=0; i<M.rows()-1; i++)  sendbuffer[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
-  sendbuffer[M.rows() -1] = M.nonZeros() - * (M.outerIndexPtr() + M.rows() -1);
+  int sendcounts[M.rows()];
+  for (int i=0; i<M.rows()-1; i++)  sendcounts[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
+  sendcounts[M.rows() -1] = M.nonZeros() - * (M.outerIndexPtr() + M.rows() -1);
 
   if (rank == 0)
   {
@@ -322,9 +322,15 @@ int main(int argc, char *argv[])
     for (int *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
     std::cout << std::endl;
     std::cout << "Sendbuffer: ";
-    for (int i=0; i<M.rows(); i++)  std::cout << sendbuffer[i] << " ";
+    for (int i=0; i<M.rows(); i++)  std::cout << sendcounts[i] << " ";
     std::cout << std::endl;
   }
+  int recvbuf[M.nonZeros()];
+  int displs[M.rows()] = 0;
+  MPI_Scatterv( *M.valuePtr(), sendcounts, displs, MPI_UINT64_T,
+              recvbuf, sendcounts, MPI_UINT64_T, 0, MPI_COMM_WORLD );
+
+  std::cout << "At proc" << rank << "Print matrix" << std::endl;
 
   // ORIGINAL IMPLEMENTATION
   // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
