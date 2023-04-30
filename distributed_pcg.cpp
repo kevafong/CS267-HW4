@@ -255,16 +255,14 @@ int main(int argc, char *argv[])
   // row-distributed matrix
   double map_time = MPI_Wtime();
 
-  MapMatrix A(N, N);
+  //MapMatrix A(n, N); remove??
 
   int offset = n * rank;
 
   // NEW MATRIX
   // Making sparse matrix using eigen instead of map.
   std::vector<T> tripletList;
-  SpMat M(N, N);
-
-  if (rank == 0)  {
+  SpMat M(n, N);
   
   for (int i = 0; i < n; i++) {
     int j = i;
@@ -305,16 +303,18 @@ int main(int argc, char *argv[])
     }
     }
     M.setFromTriplets(tripletList.begin(), tripletList.end());
-  }
+  
 
   int sendcounts[N];
   for (int i=0; i<N-1; i++)  sendcounts[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
   sendcounts[N -1] = M.nonZeros() - * (M.outerIndexPtr() + N -1);
 
-  if (rank == 0)
-  {
+  
     std::cout << "Print matrix " << std::endl;
     std::cout << M << std::endl;
+
+  if (rank == 0)
+  {  
     std::cout << "Values: ";
     for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
     std::cout << std::endl;
