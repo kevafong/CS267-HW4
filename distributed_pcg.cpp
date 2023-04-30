@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
   // Making sparse matrix using eigen instead of map.
   std::vector<T> tripletList;
   SpMat M(n, N);
-  
+  if (rank == 0)  {
   for (int i = 0; i < n; i++) {
     int j = i;
     int v_ij = 2.0;
@@ -303,7 +303,7 @@ int main(int argc, char *argv[])
     }
     }
     M.setFromTriplets(tripletList.begin(), tripletList.end());
-  
+  }
 
   int sendcounts[N];
   for (int i=0; i<N-1; i++)  sendcounts[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
@@ -337,7 +337,7 @@ int main(int argc, char *argv[])
               recvbuf, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
   std::cout << "At proc" << rank << " Receive Buffer" << std::endl;
-  std::cout << recvbuf << std::endl;
+  std::cout << *recvbuf << std::endl;
 
   // // ORIGINAL IMPLEMENTATION
   // // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
