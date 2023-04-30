@@ -312,10 +312,10 @@ int main(int argc, char *argv[])
     for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
     std::cout << std::endl;
     std::cout << "Inner: ";
-    for (double *q= M.innerIndexPtr(); q != M.innerIndexPtr() + M.nonZeros(); q++)  std::cout << *q << " ";
+    for (int *q= M.innerIndexPtr(); q != M.innerIndexPtr() + M.nonZeros(); q++)  std::cout << *q << " ";
     std::cout << std::endl;
     std::cout << "Outer: ";
-    for (double *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
+    for (int *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
     std::cout << std::endl;
 
   }
