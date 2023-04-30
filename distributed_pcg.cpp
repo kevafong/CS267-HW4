@@ -379,11 +379,11 @@ int main(int argc, char *argv[])
   if (rank == 0)
     std::cout << "wall time for CG: " << MPI_Wtime() - time << std::endl;
 
-  std::vector<double> r = A * x + (-1) * b;
+  // std::vector<double> r = A * x + (-1) * b;
 
-  double err = Norm(r) / Norm(b);
-  if (rank == 0)
-    std::cout << "|Ax-b|/|b| = " << err << std::endl;
+  // double err = Norm(r) / Norm(b);
+  // if (rank == 0)
+  //   std::cout << "|Ax-b|/|b| = " << err << std::endl;
 
   MPI_Finalize(); // Finalize the MPI environment
 
