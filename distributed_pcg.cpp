@@ -308,13 +308,16 @@ int main(int argc, char *argv[])
   {
     std::cout << "Print matrix " << std::endl;
     std::cout << M << std::endl;
-    std::cout << "Size of matrix (nnz): " << M.nonZeros() << std::endl;
-    std::cout << "Values: " << *M.valuePtr() << std::endl;
     std::cout << "Values: ";
     for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
     std::cout << std::endl;
-    std::cout << "Inner: " << *M.outerIndexPtr() << std::endl;
-    std::cout << "Outer:  "<< *M.innerIndexPtr() << std::endl;
+    std::cout << "Inner: ";
+    for (double *q= M.innerIndexPtr(); q != M.innerIndexPtr() + M.nonZeros(); q++)  std::cout << *q << " ";
+    std::cout << std::endl;
+    std::cout << "Outer: ";
+    for (double *q= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
+    std::cout << std::endl;
+
   }
 
   // ORIGINAL IMPLEMENTATION
