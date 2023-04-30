@@ -326,11 +326,12 @@ int main(int argc, char *argv[])
     std::cout << std::endl;
   }
   int recvbuf[M.nonZeros()];
-  int displs[M.rows()] = 0;
-  MPI_Scatterv( *M.valuePtr(), sendcounts, displs, MPI_DOUBLE,
+  int displs[M.rows()] = {0};
+  MPI_Scatterv( *(M.valuePtr()), sendcounts, displs, MPI_DOUBLE,
               recvbuf, sendcounts, MPI_DOUBLE, 0, MPI_COMM_WORLD );
 
   std::cout << "At proc" << rank << "Print matrix" << std::endl;
+  std::cout << M << std::endl;
 
   // ORIGINAL IMPLEMENTATION
   // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
