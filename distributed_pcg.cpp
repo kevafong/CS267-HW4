@@ -308,6 +308,10 @@ int main(int argc, char *argv[])
   {
     std::cout << "Print matrix " << std::endl;
     std::cout << M << std::endl;
+    std::cout << "Size of matrix (nnz): " << mat.nonZeros() << std::endl;
+    std::cout << "Values: " << M.valuePtr() << std::endl;
+    std::cout << "Inner: " << M.outerIndexPtr() << std::endl;
+    std::cout << "Outer:  "<< M.innerIndexPtr() << std::endl;
   }
 
   // ORIGINAL IMPLEMENTATION
