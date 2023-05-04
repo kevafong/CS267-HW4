@@ -241,6 +241,40 @@ int main(int argc, char *argv[])
   if (rank == 0)
     std::cout << "Number of procs " << size << std::endl;
 
+
+  //   //testing for MPI Scatter
+  // int buff = 6;
+  // double *sendbuf, rbuf[buff]; 
+  // int *displs, *scounts;
+  // int testsize = 6*size-2;
+  // sendbuf = (double *)malloc(testsize*sizeof(double));
+  // displs = (int *)malloc(size*sizeof(int)); 
+  // scounts = (int *)malloc(size*sizeof(int)); 
+  // for (int i=0; i<size; ++i) { 
+  //       displs[i] = (testsize*i)/size; 
+  // } 
+  // for (int i=0; i<size; ++i) { 
+  //       scounts[i] = (i<size-1) ? displs[i+1] - displs[i] : testsize - displs[i];
+  // } 
+  // if (rank == 0) {
+  // std::cout << "Sendbuffer: ";
+  //   for (int i=0; i<testsize; i++)   {
+  //     sendbuf[i] = i;
+  //     std::cout << sendbuf[i] << " ";
+  //   }
+  //   std::cout << std::endl;
+  // std::cout << "Displacements: ";
+  // for (int i=0; i<size; i++)  std::cout << displs[i] << " ";
+  // std::cout << std::endl;
+  // std::cout << "SCounts: ";
+  // for (int i=0; i<size; i++)  std::cout << scounts[i] << " ";
+  // std::cout << std::endl;
+  // }
+  // MPI_Scatterv( sendbuf, scounts, displs, MPI_DOUBLE, rbuf, scounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  // std::cout << "At proc" << rank << " Receive Buffer: ";
+  // for (int i=0; i<scounts[rank]; i++)  std::cout << rbuf[i] << " ";
+  //   std::cout << std::endl;
+
   if (find_arg_idx(argc, argv, "-h") >= 0)
   {
     std::cout << "-N <int>: side length of the sparse matrix" << std::endl;
@@ -304,38 +338,55 @@ int main(int argc, char *argv[])
     }
     M.setFromTriplets(tripletList.begin(), tripletList.end());
   }
+  
+  double sendbuffer[M.nonZeros()];
+  int start_ind[size], sendcounts[size];
+  double recvbuf[3*n];
+  for (int p=0; p<size; p++) start_ind[p] = M.outerIndexPtr()[(N*p) / size];
+  for (int p=0; p<size; p++) sendcounts[p] = (p<size-1) ? start_ind[p+1] - start_ind[p] : M.nonZeros() - start_ind[p];
 
-  int sendcounts[N];
-  for (int i=0; i<N-1; i++)  sendcounts[i]= *(M.outerIndexPtr() + i + 1) - *(M.outerIndexPtr() + i);
-  sendcounts[N -1] = M.nonZeros() - * (M.outerIndexPtr() + N -1);
 
   if (rank == 0)
   {  
-    std::cout << "Print matrix " << std::endl;
-    std::cout << M << std::endl;
-    std::cout << "Values: ";
-    for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
-    std::cout << std::endl;
-    std::cout << "Inner: ";
-    for (int *q= M.innerIndexPtr(); q != M.innerIndexPtr() + M.nonZeros(); q++)  std::cout << *q << " ";
-    std::cout << std::endl;
-    std::cout << "Outer: ";
-    for (int *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
-    std::cout << std::endl;
-    std::cout << "Sendbuffer: ";
-    for (int i=0; i<N; i++)  std::cout << sendcounts[i] << " ";
-    std::cout << std::endl;
+    // std::cout << "Print matrix " << std::endl;
+    // std::cout << M << std::endl;
+    // std::cout << "Values: ";
+    // for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
+    // std::cout << std::endl;
+    // std::cout << "Inner: ";
+    // for (int *q= M.innerIndexPtr(); q != M.innerIndexPtr() + M.nonZeros(); q++)  std::cout << *q << " ";
+    // std::cout << std::endl;
+    // std::cout << "Outer: ";
+    // for (int *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
+    // std::cout << std::endl;
+    // std::cout << "startinds: ";
+    // for (int i=0; i<size; i++)  std::cout << start_ind[i] << " ";
+    // std::cout << "Sendcounts: ";
+    // for (int i=0; i<size; i++)  std::cout << sendcounts[i] << " ";
+    // std::cout << std::endl;
   }
   MPI_Barrier(MPI_COMM_WORLD);
 
-  int recvbuf[size][M.nonZeros()]={0}, *rptr;
-  rptr = &recvbuf[0][rank];
-  int displs[N] = {0};
-  MPI_Scatterv( M.valuePtr(), sendcounts, displs, MPI_DOUBLE,
-              rptr, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
+  std::cout << "Sendbuffer of size "<< M.nonZeros()<< ": ";
+    for (int i=0; i<M.nonZeros(); i++)   {
+      sendbuffer[i] = i;
+      std::cout << sendbuffer[i] << " ";
+    }
+    std::cout << std::endl;
+  
+  std::cout << "At proc" << rank << ", ("<< sendcounts[rank] <<") Receive Buffer: ";
+  for (int i=0; i<size; i++)  std::cout << sendcounts[i] << " ";
+  std::cout << std::endl;
+  MPI_Scatterv( sendbuffer, sendcounts, start_ind, MPI_DOUBLE, recvbuf, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
+  MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
 
-  std::cout << "At proc" << rank << " Receive Buffer" << std::endl;
-  std::cout << recvbuf[0][rank] << std::endl;
+  MPI_Barrier(MPI_COMM_WORLD);
+  
+  
+  std::cout << "At proc" << rank << ", ("<< sendcounts[rank] <<") Receive Buffer: ";
+  //for (int i=0; i<size; i++)  std::cout << sendcounts[i] << " ";
+  for (int i=0; i<sendcounts[rank]; i++)  std::cout << recvbuf[i] << " ";
+  std::cout << std::endl;
 
   // // ORIGINAL IMPLEMENTATION
   // // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
