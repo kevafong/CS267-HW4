@@ -284,112 +284,134 @@ int main(int argc, char *argv[])
   int N = find_int_arg(argc, argv, "-N", 100000); // global size
 
   assert(N % size == 0);
+  // NEW MATRIX 1D decomposition
+  // Making sparse matrix using eigen instead of map.
+  // Compute the local submatrix size and indices
+  int r, s;   // # of proccessor along sides
+  int mi, ni; // index of rank along dimensions
+  int mx, nx; // length of dimensions of local matrix
+  int row_offset, col_offset;
+
+  r = sqrt(size);
+  if (r*(r+2)<=size) {
+    s = r+2;
+  }
+  else if (r*(r+1)<=size) {
+    s = r+1;
+  }
+  else {
+    s = r;
+  }
+
+  if (rank < r*s) {
+    // find the i's of the processor rank; need to exclude unused
+    mi = rank % r;
+    ni = rank / r;
+
+    // starts
+    row_offset =  (N*ni) / s;
+    col_offset =  (N*mi) / r;
+
+    // find the size of local matrices
+    mx = (mi < r - 1) ? ((N*(mi+1)) / r) - col_offset : N - col_offset;
+    nx = (ni < s - 1) ? ((N*(ni+1)) / s) - row_offset : N - row_offset; 
+  }
+
+
+  // std::cout << "Defined the local sparse matrix" << std::endl;
+  // std::cout << "mi: " << mi << std::endl;
+  // std::cout << "ni: " << ni << std::endl;
+  // std::cout << "mx: " << mx << std::endl;
+  // std::cout << "nx: " << nx << std::endl;
+  // std::cout << "col_offset: " << col_offset << std::endl;
+  // std::cout << "row_offset: " << row_offset << std::endl;
+
+  // Allocate memory for the local submatrix in CSR format
+  Eigen::SparseMatrix<double, Eigen::RowMajor, int> A_local(nx, mx);
+  std::vector<Eigen::Triplet<double>> triplets;
+
+  std::cout << "Allocated memory for sparse matrix" << std::endl;
+
+  // Fill in the local submatrix
+
+  for (int i = row_offset; i < nx + row_offset; i++)
+  {
+    int j, v_ij;
+    if (i >= col_offset && i < (mx + col_offset) )  {
+      j = i;
+      v_ij = 2.0;
+    // When pushing back to each processors local sparse matrix we must do (i - row_offset), this is because each processor, will have
+    // (nx x N) array, and so even though we are on some value of nx, its relative to the current processor.
+      triplets.push_back(T(i - row_offset, j - col_offset, v_ij));
+    }
+
+    if (i - 1 >= col_offset && (i - 1) < (mx + col_offset))
+    {
+      j = i - 1;
+      v_ij = -1;
+      triplets.push_back(T(i - row_offset, j - col_offset, v_ij));
+    }
+
+    if (i + 1 >= col_offset && (i + 1) < (mx + col_offset))
+    {
+      j = i + 1;
+      v_ij = -1;
+      triplets.push_back(T(i - row_offset, j - col_offset, v_ij));
+    }
+
+    // if (i + N < N)
+    // {
+    //   j = i + N;
+    //   v_ij = -1;
+    //   triplets.push_back(T(i - row_offset, j - col_offset, v_ij));
+    // }
+
+    // if (i - N >= 0)
+    // {
+    //   j = i - N;
+    //   v_ij = -1;
+    //   triplets.push_back(T(i - row_offset, j - col_offset, v_ij));
+    // }
+  }
+
+  std::cout << "Filled the local sparse matrix" << std::endl;
+
+  // Construct the local submatrix
+  A_local.setFromTriplets(triplets.begin(), triplets.end());
+
+  std::cout << "Constructed the following local sparse matrix on processor: " << rank << "\n"
+            << A_local << std::endl;
+
+
+  // if (rank == 0)
+  // {  
+  //   std::cout << "Print matrix " << std::endl;
+  //   std::cout << M << std::endl;
+  //   std::cout << "Values: ";
+  //   for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
+  //   std::cout << std::endl;
+  //   std::cout << "Inner: ";
+  //   for (int *q= M.innerIndexPtr(); q != M.innerIndexPtr() + M.nonZeros(); q++)  std::cout << *q << " ";
+  //   std::cout << std::endl;
+  //   std::cout << "Outer: ";
+  //   for (int *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
+  //   std::cout << std::endl;
+  // }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  
+
+ // ORIGINAL IMPLEMENTATION
+  // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
   int n = N / size; // number of local rows
 
   // row-distributed matrix
   double map_time = MPI_Wtime();
 
-  //MapMatrix A(n, N); remove??
+  // MapMatrix A(n, N);
 
   int offset = n * rank;
 
-  // NEW MATRIX
-  // Making sparse matrix using eigen instead of map.
-  std::vector<T> tripletList;
-  SpMat M(N, N);
-  if (rank == 0)  {
-  for (int i = 0; i < N; i++) {
-    int j = i;
-    int v_ij = 2.0;
-    tripletList.push_back(T(i, j, v_ij));
-    // A.Assign(i, i) = 2.0;
-
-    if (offset + i - 1 >= 0)
-    {
-      j = i - 1;
-      v_ij = -1;
-      tripletList.push_back(T(i, j, v_ij));
-      // A.Assign(i, i - 1) = -1;
-    }
-
-    if (offset + i + 1 < N)
-    {
-      j = i + 1;
-      v_ij = -1;
-      tripletList.push_back(T(i, j, v_ij));
-      // A.Assign(i, i + 1) = -1;
-    }
-
-    if (offset + i + N < N)
-    {
-      j = i + N;
-      v_ij = -1;
-      tripletList.push_back(T(i, j, v_ij));
-      // A.Assign(i, i + N) = -1;
-    }
-
-    if (offset + i - N >= 0)
-    {
-      j = i - N;
-      v_ij = -1;
-      tripletList.push_back(T(i, j, v_ij));
-      // A.Assign(i, i - N) = -1;
-    }
-    }
-    M.setFromTriplets(tripletList.begin(), tripletList.end());
-  }
-  
-  double sendbuffer[M.nonZeros()];
-  int start_ind[size], sendcounts[size];
-  double recvbuf[3*n];
-  for (int p=0; p<size; p++) start_ind[p] = M.outerIndexPtr()[(N*p) / size];
-  for (int p=0; p<size; p++) sendcounts[p] = (p<size-1) ? start_ind[p+1] - start_ind[p] : M.nonZeros() - start_ind[p];
-
-
-  if (rank == 0)
-  {  
-    // std::cout << "Print matrix " << std::endl;
-    // std::cout << M << std::endl;
-    // std::cout << "Values: ";
-    // for (double *p= M.valuePtr(); p != M.valuePtr() + M.nonZeros(); p++)  std::cout << *p << " ";
-    // std::cout << std::endl;
-    // std::cout << "Inner: ";
-    // for (int *q= M.innerIndexPtr(); q != M.innerIndexPtr() + M.nonZeros(); q++)  std::cout << *q << " ";
-    // std::cout << std::endl;
-    // std::cout << "Outer: ";
-    // for (int *r= M.outerIndexPtr(); r != M.outerIndexPtr() + M.rows(); r++)  std::cout << *r << " ";
-    // std::cout << std::endl;
-    // std::cout << "startinds: ";
-    // for (int i=0; i<size; i++)  std::cout << start_ind[i] << " ";
-    // std::cout << "Sendcounts: ";
-    // for (int i=0; i<size; i++)  std::cout << sendcounts[i] << " ";
-    // std::cout << std::endl;
-  }
-  MPI_Barrier(MPI_COMM_WORLD);
-
-  std::cout << "Sendbuffer of size "<< M.nonZeros()<< ": ";
-    for (int i=0; i<M.nonZeros(); i++)   {
-      sendbuffer[i] = i;
-      std::cout << sendbuffer[i] << " ";
-    }
-    std::cout << std::endl;
-  
-  std::cout << "At proc" << rank << ", ("<< sendcounts[rank] <<") Receive Buffer: ";
-  for (int i=0; i<size; i++)  std::cout << sendcounts[i] << " ";
-  std::cout << std::endl;
-  MPI_Scatterv( sendbuffer, sendcounts, start_ind, MPI_DOUBLE, recvbuf, sendcounts[rank], MPI_DOUBLE, 0, MPI_COMM_WORLD );
-  MPI_Bcast(sendcounts, size, MPI_INT, 0, MPI_COMM_WORLD);
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  
-  
-  std::cout << "At proc" << rank << ", ("<< sendcounts[rank] <<") Receive Buffer: ";
-  //for (int i=0; i<size; i++)  std::cout << sendcounts[i] << " ";
-  for (int i=0; i<sendcounts[rank]; i++)  std::cout << recvbuf[i] << " ";
-  std::cout << std::endl;
-
-  // // ORIGINAL IMPLEMENTATION
-  // // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
   // for (int i = 0; i < n; i++)
   // {
   //   A.Assign(i, i) = 2.0;
