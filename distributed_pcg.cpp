@@ -250,6 +250,71 @@ int main(int argc, char *argv[])
   int N = find_int_arg(argc, argv, "-N", 100000); // global size
 
   assert(N % size == 0);
+
+  // NEW MATRIX 1D decomposition
+  // Making sparse matrix using eigen instead of map.
+  // Compute the local submatrix size and indices
+  const int nx = N / size;
+  const int row_offset = nx * rank;
+
+  std::cout << "Defined the local sparse matrix" << std::endl;
+  std::cout << "nx: " << nx << std::endl;
+  std::cout << "row offset: " << row_offset << std::endl;
+
+  // Allocate memory for the local submatrix in CSR format
+  Eigen::SparseMatrix<double, Eigen::RowMajor, int> A_local(nx, N);
+  std::vector<Eigen::Triplet<double>> triplets;
+
+  std::cout << "Allocated memory for sparse matrix" << std::endl;
+
+  // Fill in the local submatrix
+  for (int i = row_offset; i < nx + row_offset; i++)
+  {
+    int j = i;
+    int v_ij = 2.0;
+    // When pushing back to each processors local sparse matrix we must do (i - row_offset), this is because each processor, will have
+    // (nx x N) array, and so even though we are on some value of nx, its relative to the current processor.
+    triplets.push_back(T(i - row_offset, j, v_ij));
+
+    if (i - 1 >= 0)
+    {
+      j = i - 1;
+      v_ij = -1;
+      triplets.push_back(T(i - row_offset, j, v_ij));
+    }
+
+    if (i + 1 < N)
+    {
+      j = i + 1;
+      v_ij = -1;
+      triplets.push_back(T(i - row_offset, j, v_ij));
+    }
+
+    if (i + N < N)
+    {
+      j = i + N;
+      v_ij = -1;
+      triplets.push_back(T(i - row_offset, j, v_ij));
+    }
+
+    if (i - N >= 0)
+    {
+      j = i - N;
+      v_ij = -1;
+      triplets.push_back(T(i - row_offset, j, v_ij));
+    }
+  }
+
+  std::cout << "Filled the local sparse matrix" << std::endl;
+
+  // Construct the local submatrix
+  A_local.setFromTriplets(triplets.begin(), triplets.end());
+
+  std::cout << "Constructed the following local sparse matrix on processor: " << rank << "\n"
+            << A_local << std::endl;
+
+  // ORIGINAL IMPLEMENTATION
+  // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
   int n = N / size; // number of local rows
 
   // row-distributed matrix
@@ -259,59 +324,6 @@ int main(int argc, char *argv[])
 
   int offset = n * rank;
 
-  // NEW MATRIX
-  // Making sparse matrix using eigen instead of map.
-  std::vector<T> tripletList;
-  for (int i = 0; i < n; i++)
-  {
-    int j = i;
-    int v_ij = 2.0;
-    tripletList.push_back(T(i, j, v_ij));
-    // A.Assign(i, i) = 2.0;
-
-    if (offset + i - 1 >= 0)
-    {
-      j = i - 1;
-      v_ij = -1;
-      tripletList.push_back(T(i, j, v_ij));
-      // A.Assign(i, i - 1) = -1;
-    }
-
-    if (offset + i + 1 < N)
-    {
-      j = i + 1;
-      v_ij = -1;
-      tripletList.push_back(T(i, j, v_ij));
-      // A.Assign(i, i + 1) = -1;
-    }
-
-    if (offset + i + N < N)
-    {
-      j = i + N;
-      v_ij = -1;
-      tripletList.push_back(T(i, j, v_ij));
-      // A.Assign(i, i + N) = -1;
-    }
-
-    if (offset + i - N >= 0)
-    {
-      j = i - N;
-      v_ij = -1;
-      tripletList.push_back(T(i, j, v_ij));
-      // A.Assign(i, i - N) = -1;
-    }
-  }
-  SpMat M(n, N);
-  M.setFromTriplets(tripletList.begin(), tripletList.end());
-
-  if (rank == 0)
-  {
-    std::cout << "Print matrix " << std::endl;
-    std::cout << M << std::endl;
-  }
-
-  // ORIGINAL IMPLEMENTATION
-  // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
   for (int i = 0; i < n; i++)
   {
     A.Assign(i, i) = 2.0;
@@ -326,10 +338,10 @@ int main(int argc, char *argv[])
   }
 
   // prints map
-  for (const auto &elem : A.data)
-  {
-    std::cout << elem.first.first << " " << elem.first.second << " " << elem.second << "\n";
-  }
+  // for (const auto &elem : A.data)
+  // {
+  //   std::cout << elem.first.first << " " << elem.first.second << " " << elem.second << "\n";
+  // }
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (rank == 0)
