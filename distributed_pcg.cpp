@@ -139,7 +139,7 @@ std::vector<double> prec(const Eigen::SimplicialCholesky<Eigen::SparseMatrix<dou
   return x;
 }
 
-// distributed conjugate gradient
+// distributed conjugate gradient with MapMatrix class
 void CG(const MapMatrix &A,
         const std::vector<double> &b,
         std::vector<double> &x,
@@ -190,6 +190,69 @@ void CG(const MapMatrix &A,
     beta = (nr * nr) / (alpha * np2);
     p = z + beta * p;
     Ap = A * p;
+    np2 = (p, Ap);
+
+    rres = sqrt((r, r));
+
+    num_it++;
+    if (rank == 0 && !(num_it % 1))
+    {
+      std::cout << "iteration: " << num_it << "\t";
+      std::cout << "residual:  " << rres << "\n";
+    }
+  }
+}
+
+std::vector<double> sm_vec_mult(Eigen::SparseMatrix<double> M, std::vector<double> V)
+{
+  Eigen::VectorXd b(V.size());
+  for (int i = 0; i < V.size(); i++)
+    b[i] = V[i];
+  Eigen::VectorXd xe = M * b;
+  std::vector<double> x(V.size());
+  for (int i = 0; i < V.size(); i++)
+    x[i] = xe[i];
+  return x;
+}
+
+// distributed conjugate gradient on 1D distributed matrix
+void CG_SPM(const Eigen::SparseMatrix<double> &A,
+            const std::vector<double> &b,
+            std::vector<double> &x,
+            double tol = 1e-6)
+{
+
+  assert(b.size() == A.rows());
+  x.assign(b.size(), 0.);
+
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Get the rank of the process
+
+  Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> P(A);
+
+  std::vector<double> r = b, z = prec(P, r), p = z, Ap = sm_vec_mult(A, p);
+
+  double np2 = (p, Ap), alpha = 0., beta = 0.;
+  double nr = sqrt((z, r));
+  double epsilon = tol * nr;
+
+  std::vector<double> res = sm_vec_mult(A, x);
+
+  res += (-1) * b;
+
+  double rres = sqrt((res, res));
+
+  int num_it = 0;
+  while (rres > 1e-5)
+  {
+    alpha = (nr * nr) / (np2);
+    x += (+alpha) * p;
+    r += (-alpha) * Ap;
+    z = prec(P, r);
+    nr = sqrt((z, r));
+    beta = (nr * nr) / (alpha * np2);
+    p = z + beta * p;
+    Ap = sm_vec_mult(A, p);
     np2 = (p, Ap);
 
     rres = sqrt((r, r));
@@ -257,15 +320,15 @@ int main(int argc, char *argv[])
   const int nx = N / size;
   const int row_offset = nx * rank;
 
-  std::cout << "Defined the local sparse matrix" << std::endl;
-  std::cout << "nx: " << nx << std::endl;
-  std::cout << "row offset: " << row_offset << std::endl;
+  // std::cout << "Defined the local sparse matrix" << std::endl;
+  // std::cout << "nx: " << nx << std::endl;
+  // std::cout << "row offset: " << row_offset << std::endl;
 
   // Allocate memory for the local submatrix in CSR format
   Eigen::SparseMatrix<double, Eigen::RowMajor, int> A_local(nx, N);
   std::vector<Eigen::Triplet<double>> triplets;
 
-  std::cout << "Allocated memory for sparse matrix" << std::endl;
+  // std::cout << "Allocated memory for sparse matrix" << std::endl;
 
   // Fill in the local submatrix
   for (int i = row_offset; i < nx + row_offset; i++)
@@ -305,13 +368,13 @@ int main(int argc, char *argv[])
     }
   }
 
-  std::cout << "Filled the local sparse matrix" << std::endl;
+  // std::cout << "Filled the local sparse matrix" << std::endl;
 
   // Construct the local submatrix
   A_local.setFromTriplets(triplets.begin(), triplets.end());
 
-  std::cout << "Constructed the following local sparse matrix on processor: " << rank << "\n"
-            << A_local << std::endl;
+  // std::cout << "Constructed the following local sparse matrix on processor: " << rank << "\n"
+  //           << A_local << std::endl;
 
   // ORIGINAL IMPLEMENTATION
   // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
@@ -356,9 +419,12 @@ int main(int argc, char *argv[])
   MPI_Barrier(MPI_COMM_WORLD);
   double time = MPI_Wtime();
 
+  // CG_SPM(A_local, b, x);
+
   CG(A, b, x);
 
   MPI_Barrier(MPI_COMM_WORLD);
+
   if (rank == 0)
     std::cout << "wall time for CG: " << MPI_Wtime() - time << std::endl;
 
