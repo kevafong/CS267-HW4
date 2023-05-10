@@ -386,22 +386,22 @@ int main(int argc, char *argv[])
   // row-distributed matrix
   double map_time = MPI_Wtime();
 
-  MapMatrix A(n, N);
+  // MapMatrix A(n, N);
 
-  int offset = n * rank;
+  // int offset = n * rank;
 
-  for (int i = 0; i < n; i++)
-  {
-    A.Assign(i, i) = 2.0;
-    if (offset + i - 1 >= 0)
-      A.Assign(i, i - 1) = -1;
-    if (offset + i + 1 < N)
-      A.Assign(i, i + 1) = -1;
-    if (offset + i + N < N)
-      A.Assign(i, i + N) = -1;
-    if (offset + i - N >= 0)
-      A.Assign(i, i - N) = -1;
-  }
+  // for (int i = 0; i < n; i++)
+  // {
+  //   A.Assign(i, i) = 2.0;
+  //   if (offset + i - 1 >= 0)
+  //     A.Assign(i, i - 1) = -1;
+  //   if (offset + i + 1 < N)
+  //     A.Assign(i, i + 1) = -1;
+  //   if (offset + i + N < N)
+  //     A.Assign(i, i + N) = -1;
+  //   if (offset + i - N >= 0)
+  //     A.Assign(i, i - N) = -1;
+  // }
 
   // prints map
   // for (const auto &elem : A.data)
@@ -433,32 +433,27 @@ int main(int argc, char *argv[])
   for (int i = 0; i < size; i++)
   {
     displs[i] = i * n;
-    // if (i != 0)
-    // {
-    //   displs[i] += 1;
-    // }
   }
   std::vector<int> recv_counts(size, n);
-  std::vector<double> total_x(N);
+  std::vector<double> total_r(N);
+  std::vector<double> total_b(N);
 
-  MPI_Gatherv(x.data(), n, MPI_DOUBLE, total_x.data(), recv_counts.data(), displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  // Gathering all b from processors.
+  MPI_Gatherv(b.data(), n, MPI_DOUBLE, total_b.data(), recv_counts.data(), displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   if (rank == 0)
     std::cout << "wall time for CG: " << MPI_Wtime() - time << std::endl;
 
-  if (rank == 0)
-  {
-    std::cout << "Vector total_x size: " << total_x.size() << std::endl;
-    std::cout << "Values:" << std::endl;
-    for (int i = 0; i < total_x.size(); i++)
-    {
-      std::cout << total_x[i] << std::endl;
-    }
-  }
+  Eigen::SparseMatrix<double> A_block = A_local.middleCols(row_offset, A_local.rows());
 
-  std::vector<double> r = A * x + (-1) * b;
+  // Computing local r for each processor.
+  std::vector<double> r = sm_vec_mult(A_block, x) + (-1) * b;
 
-  double err = Norm(r) / Norm(b);
+  // Gathering all r from each processor.
+  MPI_Gatherv(r.data(), n, MPI_DOUBLE, total_r.data(), recv_counts.data(), displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  // Computing total error from all processors.
+  double err = Norm(total_r) / Norm(total_b);
   if (rank == 0)
     std::cout << "|Ax-b|/|b| = " << err << std::endl;
 
