@@ -71,6 +71,108 @@ public:
   }
 };
 
+ std::vector<double> spmat_vec_mult_2D (Eigen::SparseMatrix<double> M, std::vector<double> V)  {
+  // mutiply subset of matrix with subset of vector
+  Eigen::VectorXd b(V.size());
+  for (int i = 0; i < V.size(); i++)
+    b[i] = V[i];
+  Eigen::VectorXd xe = M * b;
+  
+  // reduce along rows
+  
+  if (rank % r = 0) {
+    Eigen::VectorXd x_buffer(V.size());
+    for (int i = rank+1; i < rank + r; i++) {
+      MPI_Recv(&x_buffer.data(), xe.size, MPI_DOUBLE, i, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE); //MPI_ANY_SOURCE
+      xe = xe + x_buffer;
+    }
+  }
+
+  else {
+    int rankhead = int(rank/r) * r;
+    MPI_Send(xe.data(), xe.size(), MPI_DOUBLE, rankhead, 0, MPI_COMM_WORLD);
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+
+  if (rank % r = 0) {
+    Eigen::VectorXd x_buffer(V.size());
+    for (int i = rank+1; i < rank + r; i++) {
+      MPI_Send(xe.data(), x.size(), MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
+      MPI_Recv(&x_buffer.data(), xe.size, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+  }
+
+  else {
+    int rankhead = int(rank/r) * r;
+    MPI_Recv(&xe.data(), xe.size, MPI_DOUBLE, rankhead, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+  std::vector<double> x(V.size());
+  for (int i = 0; i < V.size(); i++)
+    x[i] = xe[i];
+  return x;
+
+  // MPI gather?? 
+};
+
+// distributed conjugate gradient on 2D distributed matrix
+void CG_SPM(const Eigen::SparseMatrix<double> &A,
+            const std::vector<double> &b,
+            std::vector<double> &x,
+            int rows;
+            int row_offset,
+            double tol = 1e-6)
+{
+
+  assert(b.size() == A.rows());
+  x.assign(b.size(), 0.);
+
+  int rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Get the rank of the process
+
+  //Eigen::SparseMatrix<double> n_n_preconditioner = A.middleCols(row_offset, A.rows());
+
+  Eigen::SimplicialCholesky<Eigen::SparseMatrix<double>> P(A);
+
+  std::vector<double> r = b, z;
+  if (rank % (rows + 1) = 0) z = prec(P, r)
+  else z = offdiag_prec(r);
+  std::vector<double> p = z, Ap = spmat_vec_mult_2D(A, p);
+
+  double np2 = (p, Ap), alpha = 0., beta = 0.;
+  double nr = sqrt((z, r));
+  double epsilon = tol * nr;
+
+  std::vector<double> res = sm_vec_mult(A, x);
+
+  res += (-1) * b;
+
+  double rres = sqrt((res, res));
+
+  int num_it = 0;
+  while (rres > 1e-5)
+  {
+    alpha = (nr * nr) / (np2);
+    x += (+alpha) * p;
+    r += (-alpha) * Ap;
+    z = prec(P, r);
+    nr = sqrt((z, r));
+    beta = (nr * nr) / (alpha * np2);
+    p = z + beta * p;
+    Ap = sm_vec_mult(A, p);
+    np2 = (p, Ap);
+
+    rres = sqrt((r, r));
+
+    num_it++;
+    if (rank == 0 && !(num_it % 1))
+    {
+      std::cout << "iteration: " << num_it << "\t";
+      std::cout << "residual:  " << rres << "\n";
+    }
+  }
+}
+
 #include <cmath>
 
 // parallel scalar product (u,v) (u and v are distributed)
@@ -136,6 +238,14 @@ std::vector<double> prec(const Eigen::SimplicialCholesky<Eigen::SparseMatrix<dou
   std::vector<double> x(u.size());
   for (int i = 0; i < u.size(); i++)
     x[i] = xe[i];
+  return x;
+}
+
+std::vector<double> offdiag_prec(const std::vector<double> &u)
+{
+  std::vector<double> x(u.size());
+    for (int i = 0; i < u.size(); i++)
+      x[i] = 0;
   return x;
 }
 
@@ -293,15 +403,16 @@ int main(int argc, char *argv[])
   int row_offset, col_offset;
 
   r = sqrt(size);
-  if (r*(r+2)<=size) {
-    s = r+2;
-  }
-  else if (r*(r+1)<=size) {
-    s = r+1;
-  }
-  else {
-    s = r;
-  }
+  s=r;
+  // if (r*(r+2)<=size) {
+  //   s = r+2;
+  // }
+  // else if (r*(r+1)<=size) {
+  //   s = r+1;
+  // }
+  // else {
+  //   s = r;
+  // }
 
   if (rank < r*s) {
     // find the i's of the processor rank; need to exclude unused
@@ -325,6 +436,8 @@ int main(int argc, char *argv[])
   // std::cout << "nx: " << nx << std::endl;
   // std::cout << "col_offset: " << col_offset << std::endl;
   // std::cout << "row_offset: " << row_offset << std::endl;
+
+  double map_time = MPI_Wtime();
 
   // Allocate memory for the local submatrix in CSR format
   Eigen::SparseMatrix<double, Eigen::RowMajor, int> A_local(nx, mx);
@@ -372,15 +485,16 @@ int main(int argc, char *argv[])
     //   v_ij = -1;
     //   triplets.push_back(T(i - row_offset, j - col_offset, v_ij));
     // }
+
+    std::cout << "Filled the local sparse matrix" << std::endl;
   }
 
-  std::cout << "Filled the local sparse matrix" << std::endl;
+  
 
   // Construct the local submatrix
   A_local.setFromTriplets(triplets.begin(), triplets.end());
 
-  std::cout << "Constructed the following local sparse matrix on processor: " << rank << "\n"
-            << A_local << std::endl;
+  std::cout << "Constructed the following local sparse matrix on processor: " << rank << "\n" << A_local << std::endl;
 
 
   // if (rank == 0)
@@ -406,24 +520,24 @@ int main(int argc, char *argv[])
   int n = N / size; // number of local rows
 
   // row-distributed matrix
-  double map_time = MPI_Wtime();
+  
 
-  // MapMatrix A(n, N);
+  MapMatrix A(n, N);
 
   int offset = n * rank;
 
-  // for (int i = 0; i < n; i++)
-  // {
-  //   A.Assign(i, i) = 2.0;
-  //   if (offset + i - 1 >= 0)
-  //     A.Assign(i, i - 1) = -1;
-  //   if (offset + i + 1 < N)
-  //     A.Assign(i, i + 1) = -1;
-  //   if (offset + i + N < N)
-  //     A.Assign(i, i + N) = -1;
-  //   if (offset + i - N >= 0)
-  //     A.Assign(i, i - N) = -1;
-  // }
+  for (int i = 0; i < n; i++)
+  {
+    A.Assign(i, i) = 2.0;
+    if (offset + i - 1 >= 0)
+      A.Assign(i, i - 1) = -1;
+    if (offset + i + 1 < N)
+      A.Assign(i, i + 1) = -1;
+    if (offset + i + N < N)
+      A.Assign(i, i + N) = -1;
+    if (offset + i - N >= 0)
+      A.Assign(i, i - N) = -1;
+  }
 
   // // prints map
   // for (const auto &elem : A.data)
@@ -444,17 +558,20 @@ int main(int argc, char *argv[])
   MPI_Barrier(MPI_COMM_WORLD);
   double time = MPI_Wtime();
 
-  // CG(A, b, x);
+  CG(A, b, x);
 
   MPI_Barrier(MPI_COMM_WORLD);
   if (rank == 0)
     std::cout << "wall time for CG: " << MPI_Wtime() - time << std::endl;
 
-  // std::vector<double> r = A * x + (-1) * b;
+  //std::vector<double> r = A * x + (-1) * b;
+  std::vector<double> r = spmat_vec_mult_2D(A, x, t) + (-1) * b;
 
-  // double err = Norm(r) / Norm(b);
-  // if (rank == 0)
-  //   std::cout << "|Ax-b|/|b| = " << err << std::endl;
+   MPI_Gatherv(r.data(), n, MPI_DOUBLE, total_r.data(), recv_counts.data(), displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  double err = Norm(r) / Norm(b);
+  if (rank == 0)
+    std::cout << "|Ax-b|/|b| = " << err << std::endl;
 
   MPI_Finalize(); // Finalize the MPI environment
 
