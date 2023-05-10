@@ -239,7 +239,7 @@ void CG_SPM(const Eigen::SparseMatrix<double> &A,
   double nr = sqrt((z, r));
   double epsilon = tol * nr;
 
-  std::vector<double> res = sm_vec_mult(A, x);
+  std::vector<double> res = sm_vec_mult(n_n_preconditioner, x);
 
   res += (-1) * b;
 
@@ -423,7 +423,8 @@ int main(int argc, char *argv[])
   double time = MPI_Wtime();
 
   CG_SPM(A_local, b, x, row_offset);
-
+  if (rank == 0)
+    std::cout << "CG completed: " << std::endl;
   // CG(A, b, x);
 
   MPI_Barrier(MPI_COMM_WORLD);
