@@ -317,6 +317,9 @@ int main(int argc, char *argv[])
 
   assert(N % size == 0);
 
+  // row-distributed matrix
+  double map_time = MPI_Wtime();
+
   // NEW MATRIX 1D decomposition
   // Making sparse matrix using eigen instead of map.
   // Compute the local submatrix size and indices
@@ -383,36 +386,6 @@ int main(int argc, char *argv[])
   // local rows of the 1D Laplacian matrix; local column indices start at -1 for rank > 0
   int n = N / size; // number of local rows
 
-  // row-distributed matrix
-  double map_time = MPI_Wtime();
-
-  // MapMatrix A(n, N);
-
-  // int offset = n * rank;
-
-  // for (int i = 0; i < n; i++)
-  // {
-  //   A.Assign(i, i) = 2.0;
-  //   if (offset + i - 1 >= 0)
-  //     A.Assign(i, i - 1) = -1;
-  //   if (offset + i + 1 < N)
-  //     A.Assign(i, i + 1) = -1;
-  //   if (offset + i + N < N)
-  //     A.Assign(i, i + N) = -1;
-  //   if (offset + i - N >= 0)
-  //     A.Assign(i, i - N) = -1;
-  // }
-
-  // prints map
-  // for (const auto &elem : A.data)
-  // {
-  //   std::cout << elem.first.first << " " << elem.first.second << " " << elem.second << "\n";
-  // }
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  if (rank == 0)
-    std::cout << "wall time for Map: " << MPI_Wtime() - map_time << std::endl;
-
   // initial guess
   std::vector<double> x(n, 0);
 
@@ -420,14 +393,15 @@ int main(int argc, char *argv[])
   std::vector<double> b(n, 1);
 
   MPI_Barrier(MPI_COMM_WORLD);
+  if (rank == 0)
+    std::cout << "Wall time for 1D: " << MPI_Wtime() - map_time << std::endl;
   double time = MPI_Wtime();
 
   CG_SPM(A_local, b, x, row_offset);
-  if (rank == 0)
-    std::cout << "CG completed: " << std::endl;
-  // CG(A, b, x);
 
   MPI_Barrier(MPI_COMM_WORLD);
+  if (rank == 0)
+    std::cout << "wall time for CG: " << MPI_Wtime() - time << std::endl;
 
   std::vector<int> displs(size);
 
@@ -441,9 +415,6 @@ int main(int argc, char *argv[])
 
   // Gathering all b from processors.
   MPI_Gatherv(b.data(), n, MPI_DOUBLE, total_b.data(), recv_counts.data(), displs.data(), MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
-  if (rank == 0)
-    std::cout << "wall time for CG: " << MPI_Wtime() - time << std::endl;
 
   Eigen::SparseMatrix<double> A_block = A_local.middleCols(row_offset, A_local.rows());
 
